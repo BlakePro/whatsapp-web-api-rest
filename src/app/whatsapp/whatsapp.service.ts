@@ -2,13 +2,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import NodeCache from '@cacheable/node-cache';
 import { Boom } from '@hapi/boom';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { delay, is, to } from '@src/tools';
-import makeWASocket, { Browsers, CacheStore, Chat, ConnectionState, Contact, DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion, isJidBroadcast, isJidNewsletter, isJidStatusBroadcast, makeCacheableSignalKeyStore, useMultiFileAuthState, WACallEvent, WAPresence } from 'baileys';
+import makeWASocket, { Browsers, CacheStore, Chat, ConnectionState, Contact, DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion, isJidBroadcast, isJidNewsletter, isJidStatusBroadcast, makeCacheableSignalKeyStore, useMultiFileAuthState, WACallEvent, WAMessageKey, WAPresence } from 'baileys';
 import P from 'pino';
 import { WebhookService } from '../webhook/webhook.service';
-import { IMessage } from './whatsapp.interface';
+import { IMessage, IReadMessages } from './whatsapp.interface';
 const qrcode = require('qrcode-terminal');
 
 declare global {
@@ -26,7 +26,7 @@ declare global {
  */
 
 @Injectable()
-export class WhatsappService {
+export class WhatsappService implements OnModuleInit {
   private client: any = null;
   private isConnected = false;
   private readonly filePath: string = path.join(__dirname, '..', 'whatsapp_data.json');
@@ -37,6 +37,17 @@ export class WhatsappService {
     private eventEmitter: EventEmitter2,
     private webhook: WebhookService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    if (!this.hasSavedSession()) return;
+
+    this.logger.debug('Saved WhatsApp session found, starting automatically...');
+    try {
+      await this.start();
+    } catch (e) {
+      this.logger.error('Failed to auto start saved WhatsApp session', e);
+    }
+  }
 
   /**
    * Create connection to WA
@@ -197,7 +208,23 @@ export class WhatsappService {
             // Webhook
             const isMe = to.boolean(item?.key?.fromMe);
             const pushName = to.string(item?.pushName);
-            await this.webhook.send(webhooks, { from, pushName, isMe, type, message, media });
+            const messageId = to.string(item?.key?.id);
+            const participant = to.string(item?.key?.participant);
+            await this.webhook.send(webhooks, {
+              from,
+              pushName,
+              isMe,
+              type,
+              message,
+              messageId,
+              key: {
+                remoteJid: from,
+                id: messageId,
+                fromMe: isMe,
+                participant: participant === '' ? undefined : participant,
+              },
+              media,
+            });
           }
         }
       }
@@ -299,6 +326,38 @@ export class WhatsappService {
       this.logger.debug(e);
     }
     return { chatId };
+  }
+
+  /**
+   * Mark one or many messages as read.
+   * Optionally updates presence for the provided/derived jid.
+   */
+  async readMessages(payload: IReadMessages): Promise<{ read: number; keys: WAMessageKey[] }> {
+    const keys = is.array(payload?.keys) ? payload.keys : [];
+    const parsedKeys = keys
+      .map((key) => ({
+        remoteJid: to.string(key?.remoteJid),
+        id: to.string(key?.id),
+        fromMe: to.boolean(key?.fromMe),
+        participant: to.undefined(key?.participant),
+      }))
+      .filter((key) => key.remoteJid !== '' && key.id !== '') as WAMessageKey[];
+
+    if (parsedKeys.length === 0) return { read: 0, keys: [] };
+
+    try {
+      await this.client.readMessages(parsedKeys);
+
+      const presence = payload?.presence as WAPresence;
+      const jid = to.string(payload?.jid || parsedKeys[0]?.remoteJid);
+      if (!is.undefined(presence) && jid !== '') {
+        await this.client.sendPresenceUpdate(presence, jid);
+      }
+    } catch (e) {
+      this.logger.debug(e);
+    }
+
+    return { read: parsedKeys.length, keys: parsedKeys };
   }
 
   /**
@@ -450,6 +509,17 @@ export class WhatsappService {
     if (mimetype.startsWith('application/')) return 'document';
 
     return 'unknown';
+  }
+
+  private hasSavedSession(): boolean {
+    const sessionPath = path.resolve(this.credentialsFolderName);
+    if (!fs.existsSync(sessionPath)) return false;
+
+    const stats = fs.statSync(sessionPath);
+    if (!stats.isDirectory()) return false;
+
+    const files = fs.readdirSync(sessionPath);
+    return files.includes('creds.json');
   }
 
   // Read existing data from the JSON file

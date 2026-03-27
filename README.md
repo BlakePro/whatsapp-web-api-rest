@@ -193,6 +193,29 @@ npm run dev or pnpm dev
 
 <br/>
 
+- `POST` /messages/read
+
+    **Mark one or more messages as read**
+  - **keys**: Array of message keys to mark as read (`remoteJid`, `id`, optional `fromMe`, `participant`)
+  - **presence** *(optional)*: unavailable | available | composing | recording | paused
+  - **jid** *(optional)*: JID used for presence update (if omitted, uses the first key `remoteJid`)
+
+    ```json
+    {
+      "keys": [
+        {
+          "remoteJid": "5215512345678@s.whatsapp.net",
+          "id": "ABGGFlA5FpafAgo6EhQNmjM2",
+          "fromMe": false
+        }
+      ],
+      "presence": "available"
+    }
+    ```
+    `curl -X POST http://localhost:8085/messages/read`
+
+<br/>
+
 - `GET` /profile/status/:chatId
     
     **Get the status of a person/group**

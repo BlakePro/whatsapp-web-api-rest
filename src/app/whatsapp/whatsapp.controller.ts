@@ -5,7 +5,7 @@ import { Chat, Contact, WAPresence } from 'baileys';
 import { FastifyReply } from 'fastify';
 import { Observable, Subject } from 'rxjs';
 import { WebhookService } from '../webhook/webhook.service';
-import { IMessage } from './whatsapp.interface';
+import { IMessage, IReadMessages } from './whatsapp.interface';
 import { WhatsappService } from './whatsapp.service';
 
 @ApiTags('WhatsApp')
@@ -38,6 +38,13 @@ export class WhatsappController {
   async controllerPostSimulate(@Body() payload: { chatId: string; action: WAPresence }): Promise<any> {
     const { chatId, action } = payload;
     return await this.whatsapp.sendSimulate(chatId, action);
+  }
+
+  @Post('messages/read')
+  @ApiProduces('application/json')
+  @ApiConsumes('application/json')
+  async controllerPostReadMessages(@Body() payload: IReadMessages): Promise<any> {
+    return await this.whatsapp.readMessages(payload);
   }
 
   @Get('profile/status/:chatId')
