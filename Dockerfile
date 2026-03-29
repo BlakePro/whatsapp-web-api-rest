@@ -1,5 +1,8 @@
+# --------------------- Base stage ---------------------
+FROM node:24.13-alpine3.23 AS base
+
 # --------------------- Build stage ---------------------
-FROM node:22.17.0-alpine3.22 AS builder
+FROM base AS builder
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN apk add libc6-compat && \ 
@@ -8,7 +11,7 @@ COPY . .
 RUN pnpm build
 
 # --------------------- Production stage ----------------
-FROM node:22.17.0-alpine3.22 AS production
+FROM base AS production
 WORKDIR /app
 RUN apk add libc6-compat && \
 addgroup --system --gid 1001 nodejs && \
