@@ -32,7 +32,7 @@ export const to = {
     return defaultValue;
   },
   number: (num: any, defaultNumber = 0) => {
-    num = to.string(num).replace(/[^\d.\-]/g, '');
+    num = to.string(num).replace(/[^\d.-]/g, '');
     if (is.undefined(num) || num === null || Number.isNaN(num)) return defaultNumber;
     return Number(num);
   },

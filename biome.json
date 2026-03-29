@@ -1,7 +1,7 @@
 {
   "files": {
     "ignoreUnknown": false,
-    "ignore": ["dist/**", "public/**"]
+    "includes": ["**", "!.next", "!dist", "!public", "!*.json", "!.agents", "!.claude"]
   },
   "formatter": {
     "enabled": true,
@@ -9,8 +9,12 @@
     "indentStyle": "space",
     "indentWidth": 2
   },
-  "organizeImports": {
-    "enabled": true
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "linter": {
     "enabled": true,

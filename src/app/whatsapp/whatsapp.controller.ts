@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Res, Sse } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ApiConsumes, ApiProduces, ApiTags } from '@nestjs/swagger';
-import { Chat, Contact, WAPresence } from 'baileys';
+import type { Chat, Contact, WAPresence } from 'baileys';
 import { FastifyReply } from 'fastify';
 import { Observable, Subject } from 'rxjs';
 import { WebhookService } from '../webhook/webhook.service';

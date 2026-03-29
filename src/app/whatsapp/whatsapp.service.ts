@@ -5,10 +5,11 @@ import { Boom } from '@hapi/boom';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { delay, is, to } from '@src/tools';
-import makeWASocket, { Browsers, CacheStore, Chat, ConnectionState, Contact, DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion, isJidBroadcast, isJidNewsletter, isJidStatusBroadcast, makeCacheableSignalKeyStore, useMultiFileAuthState, WACallEvent, WAMessageKey, WAPresence } from 'baileys';
+import type { CacheStore, Chat, ConnectionState, Contact, WACallEvent, WAMessageKey, WAPresence } from 'baileys';
 import P from 'pino';
 import { WebhookService } from '../webhook/webhook.service';
 import { IMessage, IReadMessages } from './whatsapp.interface';
+
 const qrcode = require('qrcode-terminal');
 
 declare global {
@@ -32,6 +33,14 @@ export class WhatsappService implements OnModuleInit {
   private readonly filePath: string = path.join(__dirname, '..', 'whatsapp_data.json');
   private readonly credentialsFolderName = 'auth_info';
   private readonly logger = new Logger('Whatsapp');
+  private _baileys: typeof import('baileys') | null = null;
+
+  private async getBaileys(): Promise<typeof import('baileys')> {
+    if (!this._baileys) {
+      this._baileys = await (Function('return import("baileys")')() as Promise<typeof import('baileys')>);
+    }
+    return this._baileys;
+  }
 
   constructor(
     private eventEmitter: EventEmitter2,
@@ -68,6 +77,8 @@ export class WhatsappService implements OnModuleInit {
       this.eventEmitter.emit('start.event', { qr: '', text });
       return;
     }
+
+    const { default: makeWASocket, Browsers, fetchLatestBaileysVersion, isJidBroadcast, makeCacheableSignalKeyStore, useMultiFileAuthState } = await this.getBaileys();
 
     const { state, saveCreds } = await useMultiFileAuthState(this.credentialsFolderName);
     const { version } = await fetchLatestBaileysVersion();
@@ -119,6 +130,7 @@ export class WhatsappService implements OnModuleInit {
 
     // Handle connection close and reconnection logic
     if (connection === 'close') {
+      const { DisconnectReason } = await this.getBaileys();
       const error = lastDisconnect?.error as Boom;
       const statusCode = error?.output?.statusCode;
       const message = error?.output?.payload?.message || error?.message;
@@ -184,6 +196,7 @@ export class WhatsappService implements OnModuleInit {
     if (is.array(messages)) {
       const webhooks: any = this.webhook.get();
       if (is.array(webhooks)) {
+        const { downloadMediaMessage, isJidBroadcast, isJidNewsletter, isJidStatusBroadcast } = await this.getBaileys();
         for (const item of messages) {
           if (item?.message) {
             //this.logger.log(item)

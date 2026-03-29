@@ -1,4 +1,4 @@
-import { WAPresence } from 'baileys';
+import type { WAPresence } from 'baileys';
 
 interface IContact {
   firstname: string;
